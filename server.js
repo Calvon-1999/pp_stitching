@@ -79,19 +79,16 @@ async function mergeVideoWithMusic(videoUrl, musicUrl, uuid) {
       .run();
   });
 
-  // ✅ Mix video audio + trimmed music
+  // ✅ Stitch video (no audio) + music track
   await new Promise((resolve, reject) => {
     ffmpeg(videoPath)
       .input(processedMusicPath)
-      .complexFilter([
-        "[0:a][1:a]amix=inputs=2:duration=first:dropout_transition=0[aout]"
-      ])
       .outputOptions([
-        "-map 0:v",
-        "-map [aout]",
-        "-c:v copy",
-        "-c:a aac",
-        "-shortest"
+        "-map 0:v",   // video from first input
+        "-map 1:a",   // audio from second input
+        "-c:v copy",  // don’t re-encode video
+        "-c:a aac",   // encode audio to AAC for mp4
+        "-shortest"   // cut off at shorter stream
       ])
       .output(outputPath)
       .on("end", resolve)
