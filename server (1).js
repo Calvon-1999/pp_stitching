@@ -59,35 +59,35 @@ async function mergeVideoWithMusic(videoUrl, musicUrl, uuid) {
     });
   });
 
-  // Process music: loop, trim, fade out, and lower volume slightly
+  // ✅ Process music: trim to match video duration
   const processedMusicPath = `./temp/processed-music-${uuid}.mp3`;
   await new Promise((resolve, reject) => {
     ffmpeg(musicPath)
-      .inputOptions(['-stream_loop -1'])
       .audioFilters([
-        `atrim=0:${videoDuration}`,
-        `afade=t=out:st=${Math.max(0, videoDuration - 2)}:d=2`,
-        `volume=-10dB`
+        `atrim=0:${videoDuration}`, // trim to video length
+        `afade=t=out:st=${Math.max(0, videoDuration - 2)}:d=2`, // fade out last 2s
+        `volume=-5dB` // slight volume reduction
       ])
+      .outputOptions(["-t", videoDuration]) // force cut to duration
       .output(processedMusicPath)
-      .on('end', resolve)
-      .on('error', reject)
+      .on("end", resolve)
+      .on("error", reject)
       .run();
   });
 
-  // Mix video audio + background music together
+  // ✅ Mix video audio + trimmed music
   await new Promise((resolve, reject) => {
     ffmpeg(videoPath)
       .input(processedMusicPath)
       .complexFilter([
-        "[0:a][1:a]amix=inputs=2:duration=shortest:dropout_transition=0[aout]"
+        "[0:a][1:a]amix=inputs=2:duration=first:dropout_transition=0[aout]"
       ])
       .outputOptions([
-        "-map 0:v",     // keep original video
-        "-map [aout]",  // use mixed audio
-        "-c:v copy",    // don't re-encode video
-        "-c:a aac",     // ensure mp4 compatibility
-        "-shortest"     // cut to shortest stream
+        "-map 0:v",    // keep original video
+        "-map [aout]", // use mixed audio
+        "-c:v copy",   // don't re-encode video
+        "-c:a aac",    // ensure MP4 compatibility
+        "-shortest"    // ensure final length = video length
       ])
       .output(outputPath)
       .on("end", resolve)
